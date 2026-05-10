@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// =====================================================================
+// Iqbal & Zulaikha Archive — Firestore rules
+//
+// IMPORTANT:
+//   The auto-seeder in `assets/js/app.js` writes to /memories on first
+//   load. For the seed (and the in-app "Add memory" form) to work,
+//   /memories must be writable from the browser.
+//
+//   Pick ONE of the modes below for your project.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------
+    // MODE A — Open writes (USE FIRST, then lock down)
+    // Easiest path for the initial seed. Anyone with the URL can
+    // read & write the archive. Switch to MODE B once seeded.
+    // -------------------------------------------------------------
+    match /memories/{id} {
+      allow read, write: if true;
+    }
+
+    // -------------------------------------------------------------
+    // MODE B — Lock to two emails (recommended after seeding)
+    // Requires Firebase Auth. Replace the email list with your own
+    // and remove MODE A above.
+    // -------------------------------------------------------------
+    // match /memories/{id} {
+    //   allow read, write: if request.auth != null
+    //     && request.auth.token.email in [
+    //       'iqbal@example.com',
+    //       'zulaikha@example.com'
+    //     ];
+    // }
+  }
+}
