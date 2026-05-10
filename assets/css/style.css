@@ -271,7 +271,41 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
 .memory .platform.pl-threads,
 .memory .platform-tag.pl-threads   { color: #2A2231; background: linear-gradient(135deg, #fff, #F1ECF6); }
 
-.memory .timestamp { margin-left: auto; font-size: 11px; color: var(--ink-soft); }
+.memory .timestamp { margin-left: auto; font-size: 11px; color: var(--ink-soft); flex-shrink: 0; }
+
+/* Who uploaded this link — visible in card header */
+.uploader-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; letter-spacing: 0.06em;
+  padding: 5px 11px; border-radius: 999px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.88);
+  color: var(--ink);
+}
+.uploader-pill .uploader-hint {
+  font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: 9px; color: var(--ink-soft);
+}
+.uploader-pill strong { font-family: 'Fraunces', Georgia, serif; font-weight: 500; font-size: 13px; }
+.uploader-pill.up-zulaikha {
+  border-color: rgba(244, 166, 188, 0.55);
+  background: linear-gradient(135deg, #fff, #FDEAF1);
+  color: #8E3D5A;
+}
+.uploader-pill.up-iqbal {
+  border-color: rgba(201, 183, 236, 0.55);
+  background: linear-gradient(135deg, #fff, #F3ECFB);
+  color: #5B4A86;
+}
+.uploader-pill.uploader-seed {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--ink-mute);
+  background: rgba(255,255,255,0.55);
+  border-style: dashed;
+}
 
 .mood-pill {
   display: inline-flex; align-items: center; gap: 6px;
@@ -319,22 +353,6 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
   font-size: 13px; color: var(--ink-soft); text-align: center;
   background: rgba(255,247,242,0.75); border: 1px dashed rgba(244, 166, 188, 0.45);
 }
-
-/* Who saved the link */
-.uploaded-by {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 12px; color: var(--ink-soft);
-  padding: 8px 12px; border-radius: var(--r-md);
-  background: rgba(255,255,255,0.5);
-  border: 1px solid rgba(255,255,255,0.85);
-}
-.uploaded-by .ub-dot {
-  width: 8px; height: 8px; border-radius: 999px; flex: none;
-  background: linear-gradient(135deg, var(--rose), var(--lavender-deep));
-}
-.uploaded-by.ub-zulaikha .ub-dot { background: linear-gradient(135deg, var(--z-from), var(--z-to)); }
-.uploaded-by.ub-iqbal .ub-dot { background: linear-gradient(135deg, var(--i-from), var(--i-to)); }
-.uploaded-by strong { color: var(--ink); font-weight: 600; }
 
 /* Add-memory form: order + highlight “you” */
 .add-fields {

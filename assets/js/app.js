@@ -238,11 +238,17 @@ function applyAddFormIdentity(who) {
   }
 }
 
-function uploadedByLineHTML(uploadedBy) {
-  if (uploadedBy !== "iqbal" && uploadedBy !== "zulaikha") return "";
-  const name = uploadedBy === "iqbal" ? "Iqbal" : "Zulaikha";
-  const cls = uploadedBy === "iqbal" ? "iqbal" : "zulaikha";
-  return `<div class="uploaded-by ub-${cls}" role="status"><span class="ub-dot" aria-hidden="true"></span> link added by <strong>${escapeHTML(name)}</strong></div>`;
+/** Prominent feed badge: who saved the link (from Firestore `uploadedBy`). */
+function uploaderBadgeHTML(m) {
+  const u = m.uploadedBy;
+  if (u === "iqbal" || u === "zulaikha") {
+    const name = u === "iqbal" ? "Iqbal" : "Zulaikha";
+    return `<span class="uploader-pill up-${u}" role="status" title="Who added this link to the archive"><span class="uploader-hint">Uploader</span><strong>${escapeHTML(name)}</strong></span>`;
+  }
+  if (m.seeded) {
+    return `<span class="uploader-pill uploader-seed" title="From the imported seed list (no uploader tag)">seed</span>`;
+  }
+  return "";
 }
 
 /** One-shot emoji strip for add-memory modal */
@@ -475,11 +481,11 @@ function memoryCardHTML(m, identity) {
     <article class="memory" data-id="${escapeAttr(m.id)}" data-mood="${escapeAttr(m.mood || "")}" data-owner="${ownerTag}">
       <div class="top">
         <span class="platform-tag pl-${platform}">${escapeHTML(platform)}</span>
+        ${uploaderBadgeHTML(m)}
         ${moodPillHTML(m.mood)}
         <span class="timestamp">${fmtTime(m.createdAt)}</span>
       </div>
       ${platformTileHTML(m.url, platform)}
-      ${uploadedByLineHTML(m.uploadedBy)}
       <div class="bubbles">
         ${idBanner}
         ${slotForOwner(m, "zulaikha", identity)}
