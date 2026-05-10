@@ -174,26 +174,64 @@ function setupIdentityBar(getMemories, rerender) {
   syncIdentityBarUI();
 }
 
-/** Add-memory sheet: put “your” note block first + highlight (follows device identity). */
+/**
+ * Add-memory sheet: only the current device identity sees their note fields.
+ * The other person’s block is hidden and inputs disabled so nothing leaks in the UI or FormData.
+ */
 function applyAddFormIdentity(who) {
   const wrap = $("#add-fields");
   const lede = $("#add-form-lede");
   const z = wrap?.querySelector('[data-owner="zulaikha"]');
   const i = wrap?.querySelector('[data-owner="iqbal"]');
-  if (!wrap || !z || !i) return;
+  const zTa = $("#z-comment");
+  const iTa = $("#i-comment");
+  const zEm = $("#field-z-emoji");
+  const iEm = $("#field-i-emoji");
+  if (!wrap || !z || !i || !zTa || !iTa || !zEm || !iEm) return;
 
   wrap.dataset.adder = who || "";
-  z.classList.toggle("field-you", who === "zulaikha");
-  i.classList.toggle("field-you", who === "iqbal");
 
-  if (who === "zulaikha") wrap.insertBefore(z, i);
-  else if (who === "iqbal") wrap.insertBefore(i, z);
+  if (who === "zulaikha") {
+    z.hidden = false;
+    i.hidden = true;
+    zTa.disabled = false;
+    iTa.disabled = true;
+    zEm.disabled = false;
+    iEm.disabled = true;
+    iTa.value = "";
+    iEm.value = "";
+    z.classList.add("field-you");
+    i.classList.remove("field-you");
+  } else if (who === "iqbal") {
+    z.hidden = true;
+    i.hidden = false;
+    zTa.disabled = true;
+    iTa.disabled = false;
+    zEm.disabled = true;
+    iEm.disabled = false;
+    zTa.value = "";
+    zEm.value = "";
+    z.classList.remove("field-you");
+    i.classList.add("field-you");
+  } else {
+    z.hidden = false;
+    i.hidden = false;
+    zTa.disabled = false;
+    iTa.disabled = false;
+    zEm.disabled = false;
+    iEm.disabled = false;
+    z.classList.remove("field-you");
+    i.classList.remove("field-you");
+  }
+
+  bindEmojiStrip("#emoji-strip-z", "#field-z-emoji");
+  bindEmojiStrip("#emoji-strip-i", "#field-i-emoji");
 
   if (lede) {
     if (who === "zulaikha") {
-      lede.innerHTML = "You’re saving this link as <strong>Zulaikha</strong>. Your note and emoji are first — Iqbal’s side is optional.";
+      lede.innerHTML = "You’re saving this link as <strong>Zulaikha</strong>. Only you add your note here — Iqbal never sees this screen on your device; they add theirs on theirs.";
     } else if (who === "iqbal") {
-      lede.innerHTML = "You’re saving this link as <strong>Iqbal</strong>. Your note and emoji are first — Zulaikha’s side is optional.";
+      lede.innerHTML = "You’re saving this link as <strong>Iqbal</strong>. Only you add your note here — Zulaikha never sees this screen on your device; they add theirs on theirs.";
     } else {
       lede.textContent = "Paste a TikTok, Instagram reel, YouTube or Threads link — choose who you are above first.";
     }
@@ -572,6 +610,14 @@ function setupModal(onSubmit) {
       mood: (data.get("mood") || "soft_emotional").toString(),
       uploadedBy: who,
     };
+    if (who === "iqbal") {
+      payload.zulaikhaComment = null;
+      payload.zulaikhaEmoji = null;
+    }
+    if (who === "zulaikha") {
+      payload.iqbalComment = null;
+      payload.iqbalEmoji = null;
+    }
     if (!payload.url) { $("#mem-link")?.focus(); return; }
     payload.platform = detectPlatform(payload.url);
 
@@ -581,8 +627,7 @@ function setupModal(onSubmit) {
       await onSubmit(payload);
       form.reset();
       grid.querySelector("input")?.click();
-      bindEmojiStrip("#emoji-strip-z", "#field-z-emoji");
-      bindEmojiStrip("#emoji-strip-i", "#field-i-emoji");
+      applyAddFormIdentity(getIdentity());
       close();
       toast("saved to our archive ♡");
     } catch (err) {

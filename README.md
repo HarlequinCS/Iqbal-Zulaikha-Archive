@@ -65,6 +65,8 @@ Each memory is a single shared moment with optional notes from each side:
 
 Stored in Firestore collection: **`memories`**.
 
+On **Add a memory**, only the note fields for **who is on this device** appear (the other person’s fields are hidden). Each side adds their comment from their own phone/tablet.
+
 Mood palette → see `MOODS` in `assets/js/app.js`.
 
 ---
