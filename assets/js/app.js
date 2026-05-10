@@ -166,9 +166,45 @@ function setupIdentityBar(getMemories, rerender) {
       setIdentity(btn.dataset.identity);
       syncIdentityBarUI();
       rerender(getMemories(), activeFilter);
+      if ($("#add-modal")?.classList.contains("is-open")) {
+        applyAddFormIdentity(getIdentity());
+      }
     });
   });
   syncIdentityBarUI();
+}
+
+/** Add-memory sheet: put “your” note block first + highlight (follows device identity). */
+function applyAddFormIdentity(who) {
+  const wrap = $("#add-fields");
+  const lede = $("#add-form-lede");
+  const z = wrap?.querySelector('[data-owner="zulaikha"]');
+  const i = wrap?.querySelector('[data-owner="iqbal"]');
+  if (!wrap || !z || !i) return;
+
+  wrap.dataset.adder = who || "";
+  z.classList.toggle("field-you", who === "zulaikha");
+  i.classList.toggle("field-you", who === "iqbal");
+
+  if (who === "zulaikha") wrap.insertBefore(z, i);
+  else if (who === "iqbal") wrap.insertBefore(i, z);
+
+  if (lede) {
+    if (who === "zulaikha") {
+      lede.innerHTML = "You’re saving this link as <strong>Zulaikha</strong>. Your note and emoji are first — Iqbal’s side is optional.";
+    } else if (who === "iqbal") {
+      lede.innerHTML = "You’re saving this link as <strong>Iqbal</strong>. Your note and emoji are first — Zulaikha’s side is optional.";
+    } else {
+      lede.textContent = "Paste a TikTok, Instagram reel, YouTube or Threads link — choose who you are above first.";
+    }
+  }
+}
+
+function uploadedByLineHTML(uploadedBy) {
+  if (uploadedBy !== "iqbal" && uploadedBy !== "zulaikha") return "";
+  const name = uploadedBy === "iqbal" ? "Iqbal" : "Zulaikha";
+  const cls = uploadedBy === "iqbal" ? "iqbal" : "zulaikha";
+  return `<div class="uploaded-by ub-${cls}" role="status"><span class="ub-dot" aria-hidden="true"></span> link added by <strong>${escapeHTML(name)}</strong></div>`;
 }
 
 /** One-shot emoji strip for add-memory modal */
@@ -405,6 +441,7 @@ function memoryCardHTML(m, identity) {
         <span class="timestamp">${fmtTime(m.createdAt)}</span>
       </div>
       ${platformTileHTML(m.url, platform)}
+      ${uploadedByLineHTML(m.uploadedBy)}
       <div class="bubbles">
         ${idBanner}
         ${slotForOwner(m, "zulaikha", identity)}
@@ -493,6 +530,13 @@ function setupModal(onSubmit) {
   `).join("");
 
   const open = () => {
+    const who = getIdentity();
+    if (!who) {
+      toast("Choose who you are on this device first — tap Zulaikha or Iqbal above.");
+      $("#identity-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    applyAddFormIdentity(who);
     modal.classList.add("is-open");
     document.body.style.overflow = "hidden";
     setTimeout(() => $("#mem-link")?.focus(), 200);
@@ -511,6 +555,11 @@ function setupModal(onSubmit) {
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
+    const who = getIdentity();
+    if (!who) {
+      toast("Choose who you are on this device first.");
+      return;
+    }
     const data = new FormData(form);
     const zEmo = (data.get("zulaikhaEmoji") || "").toString().trim();
     const iEmo = (data.get("iqbalEmoji") || "").toString().trim();
@@ -521,6 +570,7 @@ function setupModal(onSubmit) {
       iqbalEmoji:    iEmo || null,
       zulaikhaEmoji: zEmo || null,
       mood: (data.get("mood") || "soft_emotional").toString(),
+      uploadedBy: who,
     };
     if (!payload.url) { $("#mem-link")?.focus(); return; }
     payload.platform = detectPlatform(payload.url);

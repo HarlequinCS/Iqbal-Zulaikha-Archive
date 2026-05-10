@@ -47,8 +47,11 @@ Each memory is a single shared moment with optional notes from each side:
 {
   "url":             "https://vt.tiktok.com/…",
   "platform":        "tiktok" | "instagram" | "youtube" | "threads",
+  "uploadedBy":      "iqbal" | "zulaikha" | null,
   "iqbalComment":    "string | null",
   "zulaikhaComment": "string | null",
+  "iqbalEmoji":      "string | null",
+  "zulaikhaEmoji":   "string | null",
   "mood":            "sad | very_sad | broken | soft_emotional | neutral_soft | cute | cute_reaction |
                       reflection | warning_reflection | mixed_emotion | reaction_confused |
                       lighthearted | funny_reaction |

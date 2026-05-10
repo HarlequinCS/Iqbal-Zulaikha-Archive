@@ -78,27 +78,29 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
     <form class="sheet" id="add-form" novalidate>
       <div class="grabber" aria-hidden="true"></div>
       <h2 id="modal-title">leave a new memory</h2>
-      <p class="lede">paste a TikTok, Instagram reel, YouTube or Threads link &mdash; leave a note from either side, or both.</p>
+      <p class="lede" id="add-form-lede">paste a TikTok, Instagram reel, YouTube or Threads link &mdash; choose who you are above first.</p>
 
       <div class="field">
         <label for="mem-link">link</label>
         <input id="mem-link" name="url" type="url" inputmode="url" placeholder="https://vt.tiktok.com/&hellip; &middot; instagram.com/reel/&hellip; &middot; threads.com/@&hellip;" required>
       </div>
 
-      <div class="field">
-        <label for="z-comment">Zulaikha&rsquo;s note <span class="opt">(optional)</span></label>
-        <textarea id="z-comment" name="zulaikhaComment" rows="2" placeholder="say something soft from Zulaikha&hellip;"></textarea>
-        <span class="field-sub">emoji</span>
-        <div class="emoji-strip" id="emoji-strip-z" aria-label="Zulaikha emoji"></div>
-        <input type="hidden" name="zulaikhaEmoji" id="field-z-emoji" value="">
-      </div>
+      <div id="add-fields" class="add-fields">
+        <div class="field field-group field-zulaikha" data-owner="zulaikha">
+          <label for="z-comment">Zulaikha&rsquo;s note <span class="opt">(optional)</span></label>
+          <textarea id="z-comment" name="zulaikhaComment" rows="2" placeholder="say something soft from Zulaikha&hellip;"></textarea>
+          <span class="field-sub">emoji</span>
+          <div class="emoji-strip" id="emoji-strip-z" aria-label="Zulaikha emoji"></div>
+          <input type="hidden" name="zulaikhaEmoji" id="field-z-emoji" value="">
+        </div>
 
-      <div class="field">
-        <label for="i-comment">Iqbal&rsquo;s note <span class="opt">(optional)</span></label>
-        <textarea id="i-comment" name="iqbalComment" rows="2" placeholder="say something soft from Iqbal&hellip;"></textarea>
-        <span class="field-sub">emoji</span>
-        <div class="emoji-strip" id="emoji-strip-i" aria-label="Iqbal emoji"></div>
-        <input type="hidden" name="iqbalEmoji" id="field-i-emoji" value="">
+        <div class="field field-group field-iqbal" data-owner="iqbal">
+          <label for="i-comment">Iqbal&rsquo;s note <span class="opt">(optional)</span></label>
+          <textarea id="i-comment" name="iqbalComment" rows="2" placeholder="say something soft from Iqbal&hellip;"></textarea>
+          <span class="field-sub">emoji</span>
+          <div class="emoji-strip" id="emoji-strip-i" aria-label="Iqbal emoji"></div>
+          <input type="hidden" name="iqbalEmoji" id="field-i-emoji" value="">
+        </div>
       </div>
 
       <div class="field">
