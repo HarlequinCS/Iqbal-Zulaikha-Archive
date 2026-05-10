@@ -133,6 +133,33 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
 .hero p.subtitle { max-width: 560px; margin: 6px auto 0; color: var(--ink-soft); font-size: clamp(14px, 3.6vw, 17px); }
 .hero .scribble { display: inline-block; margin-top: 12px; font-family: 'Caveat', cursive; color: var(--rose-deep); font-size: 22px; transform: rotate(-2deg); }
 
+/* Identity — who is on this device */
+.identity-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px;
+  margin: 18px auto 6px; max-width: 440px; padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: rgba(255,255,255,0.55); border: 1px solid rgba(255,255,255,0.85);
+  backdrop-filter: blur(16px); box-shadow: var(--glass-shadow);
+}
+.identity-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-soft); width: 100%; text-align: center; }
+@media (min-width: 420px) {
+  .identity-label { width: auto; text-align: left; }
+}
+.identity-pill {
+  flex: 1; min-width: 120px; padding: 11px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.65); color: var(--ink-soft); font-weight: 600; font-size: 14px; cursor: pointer;
+  transition: all .25s cubic-bezier(.2,.8,.2,1);
+}
+.identity-pill:hover { color: var(--ink); }
+.identity-pill[data-identity="zulaikha"].is-active {
+  color: var(--ink); background: linear-gradient(180deg, #fff, #FFF1F2);
+  border-color: var(--rose); box-shadow: 0 8px 22px -12px rgba(244, 138, 168, 0.55);
+}
+.identity-pill[data-identity="iqbal"].is-active {
+  color: var(--ink); background: linear-gradient(180deg, #fff, #F3ECFB);
+  border-color: var(--lavender-deep); box-shadow: 0 8px 22px -12px rgba(201, 183, 236, 0.45);
+}
+
 /* =========================================================
    Filter bar
    ========================================================= */
@@ -228,16 +255,21 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 0 4px;
 }
-.memory .platform {
+.memory .platform,
+.memory .platform-tag {
   font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
   padding: 5px 9px; border-radius: 999px; font-weight: 600;
   background: rgba(255,255,255,0.72); border: 1px solid rgba(255,255,255,0.85);
   color: var(--ink-soft);
 }
-.memory .platform.pl-tiktok    { color: #1a1a1a; background: linear-gradient(135deg, #fff, #FCE7F3); }
-.memory .platform.pl-instagram { color: #B4385E; background: linear-gradient(135deg, #fff, #FCE7F3); }
-.memory .platform.pl-youtube   { color: #B4222C; background: linear-gradient(135deg, #fff, #FFE5E1); }
-.memory .platform.pl-threads   { color: #2A2231; background: linear-gradient(135deg, #fff, #F1ECF6); }
+.memory .platform.pl-tiktok,
+.memory .platform-tag.pl-tiktok    { color: #1a1a1a; background: linear-gradient(135deg, #fff, #FCE7F3); }
+.memory .platform.pl-instagram,
+.memory .platform-tag.pl-instagram { color: #B4385E; background: linear-gradient(135deg, #fff, #FCE7F3); }
+.memory .platform.pl-youtube,
+.memory .platform-tag.pl-youtube   { color: #B4222C; background: linear-gradient(135deg, #fff, #FFE5E1); }
+.memory .platform.pl-threads,
+.memory .platform-tag.pl-threads   { color: #2A2231; background: linear-gradient(135deg, #fff, #F1ECF6); }
 
 .memory .timestamp { margin-left: auto; font-size: 11px; color: var(--ink-soft); }
 
@@ -254,62 +286,61 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
 .mood-pill.tone-cream    { background: linear-gradient(135deg, #FFF7F2, #FBEEE7); }
 
 /* =========================================================
-   Embed
+   Platform logo tile (replaces video embed)
    ========================================================= */
-.embed {
-  position: relative; width: 100%;
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  background: linear-gradient(135deg, #FBD0DA, #E9DCF7);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
-  aspect-ratio: 16 / 9;
+.platform-tile {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; border-radius: var(--r-lg);
+  text-decoration: none; color: var(--ink);
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(253,234,241,0.55));
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow: 0 12px 32px -18px rgba(228, 138, 166, 0.35);
+  transition: transform .25s ease, box-shadow .25s ease;
 }
-.embed.portrait { aspect-ratio: 9 / 16; max-height: 640px; }
-.embed iframe {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  border: 0;
+.platform-tile:hover { transform: translateY(-1px); box-shadow: var(--glass-shadow-lg); }
+.platform-tile-icon {
+  flex: none; width: 56px; height: 56px; border-radius: 16px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.95);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
 }
-.embed .embed-fallback {
-  position: absolute; inset: 0;
-  display: grid; place-items: center; padding: 16px; text-align: center;
-  color: var(--ink-soft); font-size: 13px;
+.platform-tile-icon .glyph-svg { width: 32px; height: 32px; }
+.platform-tile.pl-tiktok .platform-tile-icon { color: #000; background: linear-gradient(145deg, #fff, #FCE7F3); }
+.platform-tile.pl-instagram .platform-tile-icon { background: linear-gradient(145deg, #fff, #FFE8F0); }
+.platform-tile.pl-youtube .platform-tile-icon { background: linear-gradient(145deg, #fff, #FFE5E1); }
+.platform-tile.pl-threads .platform-tile-icon { color: #111; background: linear-gradient(145deg, #fff, #F1ECF6); }
+.platform-tile.pl-link .platform-tile-icon { color: var(--rose-deep); }
+.platform-tile-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.platform-tile-name { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 500; }
+.platform-tile-hint { font-size: 12px; color: var(--ink-soft); letter-spacing: 0.06em; }
+
+.identity-banner {
+  padding: 10px 12px; border-radius: var(--r-md);
+  font-size: 13px; color: var(--ink-soft); text-align: center;
+  background: rgba(255,247,242,0.75); border: 1px dashed rgba(244, 166, 188, 0.45);
 }
 
-/* TikTok host needs flexible height (their iframe has its own dimensions) */
-.embed.tiktok-host {
-  aspect-ratio: auto;
-  min-height: 560px;
-  background: rgba(255,255,255,0.4);
-  display: flex; align-items: stretch; justify-content: center;
+.field-sub {
+  display: block; margin-top: 8px; margin-bottom: 4px;
+  font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-mute);
 }
-.embed.tiktok-host blockquote.tiktok-embed,
-.embed.tiktok-host iframe {
-  position: relative !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-}
-.embed.tiktok-host iframe { height: 100% !important; min-height: 560px; }
 
-/* Threads embed (text post — variable height) */
-.embed.threads-host {
-  aspect-ratio: auto;
-  min-height: 360px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(241,236,246,0.85));
-  display: block;
-  padding: 8px;
+.emoji-strip {
+  display: flex; flex-wrap: wrap; gap: 6px;
 }
-.embed.threads-host blockquote.text-post-media,
-.embed.threads-host iframe {
-  position: relative !important;
-  width: 100% !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
+.emoji-opt {
+  width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.75); font-size: 18px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-.embed.threads-host iframe { min-height: 360px; }
+.emoji-opt:hover { transform: scale(1.06); }
+.emoji-opt.is-selected {
+  border-color: var(--rose); background: linear-gradient(180deg, #fff, #FDEAF1);
+  box-shadow: 0 6px 14px -8px rgba(244, 138, 168, 0.55);
+}
+
+.modal .sheet.sheet-compact { padding-bottom: 22px; }
 
 /* =========================================================
    Comment bubbles
@@ -345,6 +376,34 @@ h1, h2, h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-s
 /* Slight color hint on whole bubble */
 .bubble.zulaikha { background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(253,234,241,0.7)); }
 .bubble.iqbal    { background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(233,220,247,0.7)); }
+
+.bubble-top {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.bubble-emoji { font-size: 17px; line-height: 1; }
+.bubble-edit {
+  margin-left: auto; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.9); background: rgba(255,255,255,0.65);
+  font-size: 11px; font-weight: 600; color: var(--ink-soft); cursor: pointer;
+}
+.bubble-edit:hover { color: var(--rose-deep); background: white; }
+
+.bubble.slot-waiting { align-items: center; opacity: 0.92; }
+.bubble-av.ghost { opacity: 0.5; }
+.slot-waiting-text { margin: 0; font-size: 13px; color: var(--ink-soft); font-style: italic; }
+.slot-waiting-text .na { font-weight: 600; color: var(--ink); font-style: normal; }
+
+.bubble.slot-add { justify-content: center; padding: 12px; }
+.bubble-add-btn {
+  width: 100%; padding: 12px 14px; border-radius: 14px;
+  border: 1px dashed rgba(244, 166, 188, 0.55); background: rgba(255,255,255,0.55);
+  color: var(--rose-deep); font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.plus-soft { font-size: 18px; opacity: 0.85; }
+
+.muted-link { font-size: 12px; color: var(--ink-mute); }
 
 /* =========================================================
    Card foot

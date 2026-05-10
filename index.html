@@ -33,6 +33,12 @@
       <div class="scribble">made with love ♡</div>
     </header>
 
+    <div class="identity-bar" id="identity-bar" role="group" aria-label="Who is using this device">
+      <span class="identity-label">on this device I am</span>
+      <button type="button" class="identity-pill" data-identity="zulaikha" aria-pressed="false">Zulaikha</button>
+      <button type="button" class="identity-pill" data-identity="iqbal" aria-pressed="false">Iqbal</button>
+    </div>
+
     <nav class="filter-bar" aria-label="Filter memories">
       <button class="filter-pill is-active" data-filter="all" aria-pressed="true">
         <span class="dot all"></span> all <span class="num" data-count="all">0</span>
@@ -78,11 +84,17 @@
       <div class="field">
         <label for="z-comment">Zulaikha&rsquo;s note <span class="opt">(optional)</span></label>
         <textarea id="z-comment" name="zulaikhaComment" rows="2" placeholder="say something soft from Zulaikha…"></textarea>
+        <span class="field-sub">emoji</span>
+        <div class="emoji-strip" id="emoji-strip-z" aria-label="Zulaikha emoji"></div>
+        <input type="hidden" name="zulaikhaEmoji" id="field-z-emoji" value="">
       </div>
 
       <div class="field">
         <label for="i-comment">Iqbal&rsquo;s note <span class="opt">(optional)</span></label>
         <textarea id="i-comment" name="iqbalComment" rows="2" placeholder="say something soft from Iqbal…"></textarea>
+        <span class="field-sub">emoji</span>
+        <div class="emoji-strip" id="emoji-strip-i" aria-label="Iqbal emoji"></div>
+        <input type="hidden" name="iqbalEmoji" id="field-i-emoji" value="">
       </div>
 
       <div class="field">
@@ -93,6 +105,29 @@
       <div class="actions">
         <button type="button" class="btn btn-ghost" data-close>cancel</button>
         <button type="submit" class="btn btn-primary">save memory</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal" id="note-edit-modal" role="dialog" aria-modal="true" aria-labelledby="note-edit-title">
+    <form class="sheet sheet-compact" id="note-edit-form" novalidate>
+      <div class="grabber" aria-hidden="true"></div>
+      <h2 id="note-edit-title">your note</h2>
+      <p class="lede" id="note-edit-lede">say something soft — pick an emoji if you like.</p>
+      <input type="hidden" name="memoryId" id="note-edit-memory-id">
+      <input type="hidden" name="owner" id="note-edit-owner">
+      <div class="field">
+        <label for="note-edit-comment">comment</label>
+        <textarea id="note-edit-comment" name="comment" rows="3" placeholder="…" required></textarea>
+      </div>
+      <div class="field">
+        <label>emoji <span class="opt">(optional)</span></label>
+        <div class="emoji-strip" id="note-edit-emoji-strip" aria-label="Emoji"></div>
+        <input type="hidden" name="emoji" id="note-edit-emoji-val" value="">
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" data-close-note>cancel</button>
+        <button type="submit" class="btn btn-primary">save</button>
       </div>
     </form>
   </div>

@@ -1,19 +1,18 @@
 /* =========================================================
    Iqbal & Zulaikha Archive — App logic (Firestore-backed)
-   - Live Firestore subscription
-   - Smart hash-based seeder: uploads only entries that
-     aren't already in Firestore (safe to re-run any time
-     you grow seed-data.js)
-   - Dual-comment memory cards (Iqbal + Zulaikha bubbles)
-   - Mood-aware visuals, filter pills
-   - Embed support: TikTok (short links via embed.js),
-     Instagram reels, YouTube, Threads (via embed.js)
+   - Live Firestore subscription + smart hash-based seeder
+   - Feed uses platform logo tiles (no video embeds)
+   - Per-device identity: each person adds/edits their note + emoji
    ========================================================= */
 
 import { db, fs } from "./firebase-init.js";
 import { SEED_MEMORIES } from "./seed-data.js";
 
 const COL_NAME = "memories";
+const IDENTITY_KEY = "iz-archive:identity";
+
+/** Quick emoji picker for per-person “emotion” on a note */
+const NOTE_EMOJIS = ["🥹", "😭", "💔", "😞", "🥰", "😤", "🤭", "✿", "♡", "☁️", "🔥", "😵‍💫", "🪞", "🧸", "☺️", "🫣"];
 
 /* =========================================================
    Mood vocabulary
@@ -88,7 +87,7 @@ function contentKey(m) {
 }
 
 /* =========================================================
-   Embed parsing
+   Platform detection + logo tile (no video embeds)
    ========================================================= */
 function detectPlatform(url, declared) {
   if (declared) return declared;
@@ -102,123 +101,233 @@ function detectPlatform(url, declared) {
   return "link";
 }
 
-function buildEmbed(url, platform) {
-  if (!url) return null;
-  let u;
-  try { u = new URL(url.trim()); } catch { return null; }
-
-  if (platform === "youtube" || u.hostname.endsWith("youtube.com") || u.hostname === "youtu.be") {
-    let id = null, portrait = false;
-    if (u.hostname === "youtu.be") id = u.pathname.split("/").filter(Boolean)[0];
-    else if (u.pathname.startsWith("/shorts/")) { id = u.pathname.split("/")[2]; portrait = true; }
-    else id = u.searchParams.get("v");
-    if (id) return { kind: "iframe", src: `https://www.youtube.com/embed/${id}`, portrait };
-  }
-
-  if (platform === "tiktok" || u.hostname.endsWith("tiktok.com")) {
-    return { kind: "tiktok-blockquote", url: u.href, portrait: true };
-  }
-
-  if (platform === "instagram" || u.hostname.endsWith("instagram.com")) {
-    const parts = u.pathname.split("/").filter(Boolean);
-    const idx = parts.findIndex(p => ["p", "reel", "reels", "tv"].includes(p));
-    const code = idx >= 0 ? parts[idx + 1] : null;
-    if (code) {
-      const portrait = parts[idx] !== "p";
-      return { kind: "iframe", src: `https://www.instagram.com/reel/${code}/embed/`, portrait };
-    }
-  }
-
-  if (platform === "threads" || u.hostname.endsWith("threads.com") || u.hostname.endsWith("threads.net")) {
-    // Normalize to threads.net so the official embed.js processes it cleanly.
-    const normalized = u.href.replace("://www.threads.com/", "://www.threads.net/")
-                              .replace("://threads.com/",     "://threads.net/");
-    return { kind: "threads-blockquote", url: normalized, portrait: false };
-  }
-
-  return { kind: "link", url: u.href };
+function platformDisplayName(p) {
+  return { tiktok: "TikTok", instagram: "Instagram", youtube: "YouTube", threads: "Threads", link: "Link" }[p] || "Link";
 }
 
-function embedHTML(embed, fallbackUrl) {
-  if (!embed) return embedFallback(fallbackUrl);
-
-  if (embed.kind === "iframe") {
-    return `<div class="embed${embed.portrait ? " portrait" : ""}">
-      <iframe src="${escapeAttr(embed.src)}" loading="lazy"
-        allow="autoplay; encrypted-media; picture-in-picture; clipboard-write"
-        allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>
-    </div>`;
+function platformGlyphSVG(p) {
+  switch (p) {
+    case "tiktok":
+      return `<svg class="glyph-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.69 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/></svg>`;
+    case "instagram":
+      return `<svg class="glyph-svg ig" viewBox="0 0 24 24" aria-hidden="true"><path fill="#E4405F" d="M12 2.2c3.2 0 3.6 0 4.9.1 1.2.1 1.9.2 2.4.4.6.2 1 .5 1.5 1 .5.5.8.9 1 1.5.2.5.4 1.2.4 2.4.1 1.3.1 1.7.1 4.9s0 3.6-.1 4.9c-.1 1.2-.2 1.9-.4 2.4-.2.6-.5 1-1 1.5-.5.5-.9.8-1.5 1-.5.2-1.2.4-2.4.4-1.3.1-1.7.1-4.9.1s-3.6 0-4.9-.1c-1.2-.1-1.9-.2-2.4-.4-.6-.2-1-.5-1.5-1-.5-.5-.8-.9-1-1.5-.2-.5-.4-1.2-.4-2.4-.1-1.3-.1-1.7-.1-4.9s0-3.6.1-4.9c.1-1.2.2-1.9.4-2.4.2-.6.5-1 1-1.5.5-.5.9-.8 1.5-1 .5-.2 1.2-.4 2.4-.4 1.3-.1 1.7-.1 4.9-.1zm0 2.2c-3.1 0-3.5 0-4.7.1-.9 0-1.4.2-1.7.3-.4.2-.7.4-1 .7-.3.3-.5.6-.7 1-.1.3-.3.8-.3 1.7-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c0 .9.2 1.4.3 1.7.2.4.4.7.7 1 .3.3.6.5 1 .7.3.1.8.3 1.7.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c.9 0 1.4-.2 1.7-.3.4-.2.7-.4 1-.7.3-.3.5-.6.7-1 .1-.3.3-.8.3-1.7.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c0-.9-.2-1.4-.3-1.7-.2-.4-.4-.7-.7-1-.3-.3-.6-.5-1-.7-.3-.1-.8-.3-1.7-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.3a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zm0 10.7a4.2 4.2 0 1 0 0-8.4 4.2 4.2 0 0 0 0 8.4zm6.6-11a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>`;
+    case "youtube":
+      return `<svg class="glyph-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="#FF0033" d="M21.8 8.2s-.2-1.6-.8-2.3c-.8-.8-1.7-.8-2.1-.9C16.5 4.5 12 4.5 12 4.5s-4.5 0-6.9.5c-.4.1-1.3.1-2.1.9-.6.7-.8 2.3-.8 2.3S2 10 2 11.8v.4c0 1.8.3 3.6.3 3.6s.2 1.6.8 2.3c.8.8 1.9.8 2.4.9 1.7.2 7.5.5 7.5.5s4.5 0 6.9-.5c.4-.1 1.3-.1 2.1-.9.6-.7.8-2.3.8-2.3s.3-1.8.3-3.6v-.4c0-1.8-.3-3.6-.3-3.6z"/><path fill="#fff" d="M10 15V9l6 3-6 3z"/></svg>`;
+    case "threads":
+      return `<svg class="glyph-svg threads-at" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6V4zm2 4c1.66 0 3 1 3 3 0 2.5-2 4-5 4H9v-2h3c1.6 0 2.5-.8 2.5-2 0-.9-.7-1.5-1.8-1.5S11 9.7 11 11v7H9V11c0-2 1.6-3.5 4-3.5z"/></svg>`;
+    default:
+      return `<svg class="glyph-svg" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>`;
   }
-
-  if (embed.kind === "tiktok-blockquote") {
-    return `<div class="embed portrait tiktok-host">
-      <blockquote class="tiktok-embed" cite="${escapeAttr(embed.url)}" data-video-id="">
-        <section><a target="_blank" rel="noopener" href="${escapeAttr(embed.url)}">Watch on TikTok</a></section>
-      </blockquote>
-    </div>`;
-  }
-
-  if (embed.kind === "threads-blockquote") {
-    return `<div class="embed threads-host">
-      <blockquote class="text-post-media" data-text-post-permalink="${escapeAttr(embed.url)}" data-text-post-version="0" style="background:transparent;border:0;margin:0;padding:0;">
-        <a target="_blank" rel="noopener" href="${escapeAttr(embed.url)}">View on Threads</a>
-      </blockquote>
-    </div>`;
-  }
-
-  return embedFallback(fallbackUrl);
 }
 
-function embedFallback(url) {
-  return `<div class="embed">
-    <div class="embed-fallback">
-      couldn't preview this — <a href="${escapeAttr(url || "#")}" target="_blank" rel="noopener">open it instead</a>
-    </div>
-  </div>`;
-}
-
-/* ----- Third-party embed scripts (load once, re-process on render) ----- */
-function loadOnce(id, src) {
-  if (document.getElementById(id)) return;
-  const s = document.createElement("script");
-  s.id = id; s.src = src; s.async = true;
-  document.body.appendChild(s);
-}
-function reinjectScript(src) {
-  // Re-injecting the script forces these embed libs to scan the DOM again.
-  const s = document.createElement("script");
-  s.src = src; s.async = true;
-  document.body.appendChild(s);
-}
-function reprocessEmbeds(platforms) {
-  if (platforms.has("tiktok")) {
-    if (window.tiktokEmbedLoad) { try { window.tiktokEmbedLoad(); } catch {} }
-    else reinjectScript("https://www.tiktok.com/embed.js");
-  }
-  if (platforms.has("threads")) {
-    // Threads embed.js processes blockquotes on load; re-inject to refresh.
-    reinjectScript("https://www.threads.net/embed.js");
-  }
+function platformTileHTML(url, platform) {
+  const label = platformDisplayName(platform);
+  const safeUrl = escapeAttr(url || "#");
+  return `
+    <a class="platform-tile pl-${platform}" href="${safeUrl}" target="_blank" rel="noopener noreferrer">
+      <span class="platform-tile-icon" aria-hidden="true">${platformGlyphSVG(platform)}</span>
+      <span class="platform-tile-meta">
+        <span class="platform-tile-name">${escapeHTML(label)}</span>
+        <span class="platform-tile-hint">open link ↗</span>
+      </span>
+    </a>`;
 }
 
 /* =========================================================
-   Card rendering
+   Who is on this device?
    ========================================================= */
-function bubbleHTML(owner, text) {
-  if (!text) return "";
-  const who = owner === "iqbal" ? "Iqbal" : "Zulaikha";
-  const initial = owner === "iqbal" ? "I" : "Z";
-  return `
-    <div class="bubble ${owner}">
-      <div class="bubble-av">${initial}</div>
-      <div class="bubble-body">
-        <span class="bubble-who">${who}</span>
-        <p>${escapeHTML(text)}</p>
-      </div>
-    </div>
-  `;
+function getIdentity() {
+  try {
+    const v = localStorage.getItem(IDENTITY_KEY);
+    if (v === "iqbal" || v === "zulaikha") return v;
+  } catch {}
+  return null;
 }
 
+function setIdentity(who) {
+  try {
+    if (who === "iqbal" || who === "zulaikha") localStorage.setItem(IDENTITY_KEY, who);
+    else localStorage.removeItem(IDENTITY_KEY);
+  } catch {}
+}
+
+function syncIdentityBarUI() {
+  const who = getIdentity();
+  $$(".identity-pill").forEach(btn => {
+    const on = btn.dataset.identity === who;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+}
+
+function setupIdentityBar(getMemories, rerender) {
+  $$(".identity-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      setIdentity(btn.dataset.identity);
+      syncIdentityBarUI();
+      rerender(getMemories(), activeFilter);
+    });
+  });
+  syncIdentityBarUI();
+}
+
+/** One-shot emoji strip for add-memory modal */
+function bindEmojiStrip(containerSel, hiddenSel) {
+  const container = $(containerSel);
+  const hidden = $(hiddenSel);
+  if (!container || !hidden) return;
+  container.innerHTML = NOTE_EMOJIS.map(e =>
+    `<button type="button" class="emoji-opt" data-emoji="${escapeAttr(e)}">${e}</button>`
+  ).join("");
+  container.onclick = ev => {
+    const b = ev.target.closest(".emoji-opt");
+    if (!b) return;
+    const em = b.dataset.emoji;
+    if (hidden.value === em) {
+      hidden.value = "";
+      $$(".emoji-opt", container).forEach(x => x.classList.remove("is-selected"));
+    } else {
+      hidden.value = em;
+      $$(".emoji-opt", container).forEach(x => x.classList.remove("is-selected"));
+      b.classList.add("is-selected");
+    }
+  };
+}
+
+/** Rebuild strip + selection for note-edit modal */
+function fillEmojiStrip(containerId, hiddenInputId, selectedVal = "") {
+  const container = document.getElementById(containerId);
+  const hidden = document.getElementById(hiddenInputId);
+  if (!container || !hidden) return;
+  hidden.value = selectedVal || "";
+  container.innerHTML = NOTE_EMOJIS.map(e => {
+    const sel = e === selectedVal ? " is-selected" : "";
+    return `<button type="button" class="emoji-opt${sel}" data-emoji="${escapeAttr(e)}">${e}</button>`;
+  }).join("");
+  container.onclick = ev => {
+    const b = ev.target.closest(".emoji-opt");
+    if (!b) return;
+    const em = b.dataset.emoji;
+    if (hidden.value === em) {
+      hidden.value = "";
+      $$(".emoji-opt", container).forEach(x => x.classList.remove("is-selected"));
+    } else {
+      hidden.value = em;
+      $$(".emoji-opt", container).forEach(x => x.classList.remove("is-selected"));
+      b.classList.add("is-selected");
+    }
+  };
+}
+
+function setupNoteEditorModal(getMemories) {
+  const modal = $("#note-edit-modal");
+  const form = $("#note-edit-form");
+  if (!modal || !form) return;
+
+  const closeNote = () => {
+    modal.classList.remove("is-open");
+    if (!$("#add-modal")?.classList.contains("is-open")) document.body.style.overflow = "";
+  };
+
+  const openNote = ({ memoryId, owner, comment, emoji }) => {
+    $("#note-edit-memory-id").value = memoryId || "";
+    $("#note-edit-owner").value = owner || "";
+    $("#note-edit-comment").value = comment || "";
+    const lede = $("#note-edit-lede");
+    if (lede) {
+      lede.textContent = owner === "iqbal"
+        ? "Iqbal — your note and emoji."
+        : "Zulaikha — your note and emoji.";
+    }
+    fillEmojiStrip("note-edit-emoji-strip", "note-edit-emoji-val", emoji || "");
+    modal.classList.add("is-open");
+    document.body.style.overflow = "hidden";
+    setTimeout(() => $("#note-edit-comment")?.focus(), 120);
+  };
+
+  document.addEventListener("click", e => {
+    const addBtn = e.target.closest("[data-add-note]");
+    if (addBtn) {
+      e.preventDefault();
+      openNote({
+        memoryId: addBtn.dataset.memoryId,
+        owner: addBtn.dataset.owner,
+        comment: "",
+        emoji: "",
+      });
+      return;
+    }
+    const edBtn = e.target.closest("[data-edit-note]");
+    if (edBtn) {
+      const mem = getMemories().find(m => m.id === edBtn.dataset.memoryId);
+      if (!mem) return;
+      const owner = edBtn.dataset.owner;
+      const comment = owner === "iqbal" ? mem.iqbalComment : mem.zulaikhaComment;
+      const emoji = owner === "iqbal" ? (mem.iqbalEmoji || "") : (mem.zulaikhaEmoji || "");
+      openNote({
+        memoryId: mem.id,
+        owner,
+        comment: comment || "",
+        emoji: emoji || "",
+      });
+    }
+  });
+
+  modal.addEventListener("click", e => { if (e.target === modal) closeNote(); });
+  modal.querySelectorAll("[data-close-note]").forEach(el => el.addEventListener("click", closeNote));
+
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    const memoryId = $("#note-edit-memory-id").value;
+    const owner = $("#note-edit-owner").value;
+    const comment = ($("#note-edit-comment").value || "").trim();
+    const emojiRaw = ($("#note-edit-emoji-val").value || "").trim();
+    if (!comment || !memoryId || !owner) return;
+
+    const submitBtn = form.querySelector(".btn-primary");
+    submitBtn.disabled = true;
+    try {
+      const ref = fs.doc(db, COL_NAME, memoryId);
+      const patch = {};
+      if (owner === "iqbal") {
+        patch.iqbalComment = comment;
+        patch.iqbalEmoji = emojiRaw || null;
+      } else {
+        patch.zulaikhaComment = comment;
+        patch.zulaikhaEmoji = emojiRaw || null;
+      }
+      await fs.updateDoc(ref, patch);
+      closeNote();
+      toast("saved ♡");
+    } catch (err) {
+      console.error(err);
+      toast("couldn't save note", true);
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+function setupGlobalEscape() {
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    const noteM = $("#note-edit-modal");
+    const addM = $("#add-modal");
+    if (noteM?.classList.contains("is-open")) {
+      noteM.classList.remove("is-open");
+      document.body.style.overflow = addM?.classList.contains("is-open") ? "hidden" : "";
+      return;
+    }
+    if (addM?.classList.contains("is-open")) {
+      addM.classList.remove("is-open");
+      document.body.style.overflow = "";
+    }
+  });
+}
+
+/* =========================================================
+   Card rendering — bubbles + optional per-side emoji
+   ========================================================= */
 function moodPillHTML(moodId) {
   const m = moodById[moodId] || { emoji: "✿", label: moodId || "soft", tone: "cream" };
   return `<span class="mood-pill tone-${m.tone}">
@@ -226,26 +335,83 @@ function moodPillHTML(moodId) {
   </span>`;
 }
 
-function memoryCardHTML(m) {
+function bubbleFilled(owner, text, emoji, memoryId, canEdit) {
+  const who = owner === "iqbal" ? "Iqbal" : "Zulaikha";
+  const initial = owner === "iqbal" ? "I" : "Z";
+  const em = emoji ? `<span class="bubble-emoji" aria-hidden="true">${escapeHTML(emoji)}</span>` : "";
+  const edit = canEdit
+    ? `<button type="button" class="bubble-edit" data-edit-note data-memory-id="${escapeAttr(memoryId)}" data-owner="${owner}" aria-label="Edit your note">edit</button>`
+    : "";
+  return `
+    <div class="bubble ${owner} has-text">
+      <div class="bubble-av">${initial}</div>
+      <div class="bubble-body">
+        <div class="bubble-top">
+          <span class="bubble-who">${who}</span>
+          ${em}
+          ${edit}
+        </div>
+        <p>${escapeHTML(text)}</p>
+      </div>
+    </div>`;
+}
+
+function bubbleWaiting(owner) {
+  const who = owner === "iqbal" ? "Iqbal" : "Zulaikha";
+  const initial = owner === "iqbal" ? "I" : "Z";
+  return `
+    <div class="bubble slot-waiting ${owner}">
+      <div class="bubble-av ghost">${initial}</div>
+      <p class="slot-waiting-text"><span class="na">${who}</span> hasn’t added a note yet</p>
+    </div>`;
+}
+
+function bubbleAddButton(memoryId, owner) {
+  return `
+    <div class="bubble slot-add ${owner}">
+      <button type="button" class="bubble-add-btn" data-add-note data-memory-id="${escapeAttr(memoryId)}" data-owner="${owner}">
+        <span class="plus-soft">+</span> Add your note
+      </button>
+    </div>`;
+}
+
+function slotForOwner(m, owner, identity) {
+  const commentKey = owner === "iqbal" ? "iqbalComment" : "zulaikhaComment";
+  const emojiKey   = owner === "iqbal" ? "iqbalEmoji"   : "zulaikhaEmoji";
+  const text = m[commentKey];
+  const emo  = m[emojiKey] || "";
+
+  if (text) {
+    const canEdit = identity === owner;
+    return bubbleFilled(owner, text, emo, m.id, canEdit);
+  }
+  if (identity === owner) return bubbleAddButton(m.id, owner);
+  return bubbleWaiting(owner);
+}
+
+function memoryCardHTML(m, identity) {
   const platform = detectPlatform(m.url, m.platform);
-  const embed = buildEmbed(m.url, platform);
   const both = m.iqbalComment && m.zulaikhaComment;
   const ownerTag = both ? "both" : (m.iqbalComment ? "iqbal" : (m.zulaikhaComment ? "zulaikha" : "none"));
+  const idBanner = !identity
+    ? `<div class="identity-banner" role="note">Choose <strong>who you are</strong> above first — then you can leave your note here.</div>`
+    : "";
 
   return `
     <article class="memory" data-id="${escapeAttr(m.id)}" data-mood="${escapeAttr(m.mood || "")}" data-owner="${ownerTag}">
       <div class="top">
-        <span class="platform pl-${platform}">${platform}</span>
+        <span class="platform-tag pl-${platform}">${escapeHTML(platform)}</span>
         ${moodPillHTML(m.mood)}
         <span class="timestamp">${fmtTime(m.createdAt)}</span>
       </div>
-      ${embedHTML(embed, m.url)}
+      ${platformTileHTML(m.url, platform)}
       <div class="bubbles">
-        ${bubbleHTML("zulaikha", m.zulaikhaComment)}
-        ${bubbleHTML("iqbal",    m.iqbalComment)}
+        ${idBanner}
+        ${slotForOwner(m, "zulaikha", identity)}
+        ${slotForOwner(m, "iqbal", identity)}
       </div>
       <div class="card-foot">
-        <a class="open-link" href="${escapeAttr(m.url)}" target="_blank" rel="noopener">open original ↗</a>
+        <span class="open-link muted-link" title="Use the tile above">watch on ${escapeHTML(platformDisplayName(platform))} ↗</span>
         <button class="react" type="button" data-react="${escapeAttr(m.id)}">
           <span class="heart">♡</span><span class="count">${Number(m.reactions || 0)}</span>
         </button>
@@ -258,6 +424,7 @@ function renderFeed(memories, filter) {
   const grid = $("#feed");
   const empty = $("#empty-state");
   const list = applyFilter(memories, filter);
+  const identity = getIdentity();
 
   if (!list.length) {
     grid.innerHTML = "";
@@ -266,13 +433,8 @@ function renderFeed(memories, filter) {
   }
   empty.hidden = true;
 
-  grid.innerHTML = list.map(memoryCardHTML).join("");
-
-  // Re-process platform-specific embeds after DOM injection
-  const platforms = new Set(list.map(m => detectPlatform(m.url, m.platform)));
-  if (platforms.has("tiktok"))  loadOnce("tiktok-embed-js",  "https://www.tiktok.com/embed.js");
-  if (platforms.has("threads")) loadOnce("threads-embed-js", "https://www.threads.net/embed.js");
-  setTimeout(() => reprocessEmbeds(platforms), 60);
+  grid.innerHTML = list.map(m => memoryCardHTML(m, identity)).join("");
+  syncIdentityBarUI();
 
   updateFilterCounts(memories);
 }
@@ -343,15 +505,21 @@ function setupModal(onSubmit) {
   openBtn.addEventListener("click", open);
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
   modal.querySelectorAll("[data-close]").forEach(el => el.addEventListener("click", close));
-  document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+
+  bindEmojiStrip("#emoji-strip-z", "#field-z-emoji");
+  bindEmojiStrip("#emoji-strip-i", "#field-i-emoji");
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const data = new FormData(form);
+    const zEmo = (data.get("zulaikhaEmoji") || "").toString().trim();
+    const iEmo = (data.get("iqbalEmoji") || "").toString().trim();
     const payload = {
       url: (data.get("url") || "").toString().trim(),
       iqbalComment:    (data.get("iqbalComment")    || "").toString().trim() || null,
       zulaikhaComment: (data.get("zulaikhaComment") || "").toString().trim() || null,
+      iqbalEmoji:    iEmo || null,
+      zulaikhaEmoji: zEmo || null,
       mood: (data.get("mood") || "soft_emotional").toString(),
     };
     if (!payload.url) { $("#mem-link")?.focus(); return; }
@@ -363,6 +531,8 @@ function setupModal(onSubmit) {
       await onSubmit(payload);
       form.reset();
       grid.querySelector("input")?.click();
+      bindEmojiStrip("#emoji-strip-z", "#field-z-emoji");
+      bindEmojiStrip("#emoji-strip-i", "#field-i-emoji");
       close();
       toast("saved to our archive ♡");
     } catch (err) {
@@ -539,7 +709,10 @@ async function boot() {
   const rerender = (list, filter = activeFilter) => renderFeed(list, filter);
 
   setupFilters(getMemories, rerender);
+  setupIdentityBar(getMemories, rerender);
   setupModal(addMemoryToFirestore);
+  setupNoteEditorModal(getMemories);
+  setupGlobalEscape();
   setupReactions(getMemories);
   spawnAmbient();
 

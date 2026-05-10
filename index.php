@@ -33,9 +33,15 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
     <header class="hero">
       <span class="badge"><span class="dot"></span> Our private archive</span>
       <h1>Iqbal <span class="amp">&amp;</span> Zulaikha</h1>
-      <p class="subtitle">A quiet little corner of the internet — for the reels, the songs and the tiny moments we never want to forget.</p>
+      <p class="subtitle">A quiet little corner of the internet &mdash; for the reels, the songs and the tiny moments we never want to forget.</p>
       <div class="scribble">made with love &#9825;</div>
     </header>
+
+    <div class="identity-bar" id="identity-bar" role="group" aria-label="Who is using this device">
+      <span class="identity-label">on this device I am</span>
+      <button type="button" class="identity-pill" data-identity="zulaikha" aria-pressed="false">Zulaikha</button>
+      <button type="button" class="identity-pill" data-identity="iqbal" aria-pressed="false">Iqbal</button>
+    </div>
 
     <nav class="filter-bar" aria-label="Filter memories">
       <button class="filter-pill is-active" data-filter="all" aria-pressed="true">
@@ -82,11 +88,17 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
       <div class="field">
         <label for="z-comment">Zulaikha&rsquo;s note <span class="opt">(optional)</span></label>
         <textarea id="z-comment" name="zulaikhaComment" rows="2" placeholder="say something soft from Zulaikha&hellip;"></textarea>
+        <span class="field-sub">emoji</span>
+        <div class="emoji-strip" id="emoji-strip-z" aria-label="Zulaikha emoji"></div>
+        <input type="hidden" name="zulaikhaEmoji" id="field-z-emoji" value="">
       </div>
 
       <div class="field">
         <label for="i-comment">Iqbal&rsquo;s note <span class="opt">(optional)</span></label>
         <textarea id="i-comment" name="iqbalComment" rows="2" placeholder="say something soft from Iqbal&hellip;"></textarea>
+        <span class="field-sub">emoji</span>
+        <div class="emoji-strip" id="emoji-strip-i" aria-label="Iqbal emoji"></div>
+        <input type="hidden" name="iqbalEmoji" id="field-i-emoji" value="">
       </div>
 
       <div class="field">
@@ -97,6 +109,29 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
       <div class="actions">
         <button type="button" class="btn btn-ghost" data-close>cancel</button>
         <button type="submit" class="btn btn-primary">save memory</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="modal" id="note-edit-modal" role="dialog" aria-modal="true" aria-labelledby="note-edit-title">
+    <form class="sheet sheet-compact" id="note-edit-form" novalidate>
+      <div class="grabber" aria-hidden="true"></div>
+      <h2 id="note-edit-title">your note</h2>
+      <p class="lede" id="note-edit-lede">say something soft &mdash; pick an emoji if you like.</p>
+      <input type="hidden" name="memoryId" id="note-edit-memory-id">
+      <input type="hidden" name="owner" id="note-edit-owner">
+      <div class="field">
+        <label for="note-edit-comment">comment</label>
+        <textarea id="note-edit-comment" name="comment" rows="3" placeholder="&hellip;" required></textarea>
+      </div>
+      <div class="field">
+        <label>emoji <span class="opt">(optional)</span></label>
+        <div class="emoji-strip" id="note-edit-emoji-strip" aria-label="Emoji"></div>
+        <input type="hidden" name="emoji" id="note-edit-emoji-val" value="">
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" data-close-note>cancel</button>
+        <button type="submit" class="btn btn-primary">save</button>
       </div>
     </form>
   </div>
