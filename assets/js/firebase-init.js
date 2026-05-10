@@ -53,5 +53,3 @@ if (typeof window !== "undefined") {
   window.firebaseDb  = db;
   window.firebaseFs  = fs;
 }
-
-console.log("[firebase] initialized:", app.name);

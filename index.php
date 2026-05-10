@@ -33,8 +33,8 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
     <header class="hero">
       <span class="badge"><span class="dot"></span> Our private archive</span>
       <h1>Iqbal <span class="amp">&amp;</span> Zulaikha</h1>
-      <p class="subtitle">A quiet little corner of the internet &mdash; for the reels, the songs and the tiny moments we never want to forget.</p>
-      <div class="scribble">made with love &#9825;</div>
+      <p class="subtitle">Sebuah Ruangan Khas Di mana Segala Jenis Cerita Dikongsikan Bersama Di kala waktu menjelang Pukul 2.</p>
+      <div class="scribble">made with love ♡</div>
     </header>
 
     <div class="identity-bar" id="identity-bar" role="group" aria-label="Who is using this device">
@@ -56,20 +56,23 @@ $pageDesc  = 'A soft, private memory archive — reels, songs and tiny moments s
       <button class="filter-pill" data-filter="both" aria-pressed="false">
         <span class="dot both"></span> both wrote <span class="num" data-count="both">0</span>
       </button>
+      <button class="filter-pill filter-done" data-filter="done" aria-pressed="false">
+        <span class="dot done"></span> done watching <span class="num" data-count="done">0</span>
+      </button>
     </nav>
 
     <section class="feed" id="feed" aria-live="polite"></section>
 
     <div class="empty" id="empty-state" hidden>
       <div class="glyph">&#10047;</div>
-      <h3>nothing matches yet</h3>
-      <p>try a different filter, or tap <strong>+ Add a memory</strong> to begin.</p>
+      <h3>nothing in this little corner yet &#9825;</h3>
+      <p>try a different filter &mdash; or tap <strong>+ Add a memory</strong> to leave something soft.</p>
     </div>
 
     <p class="kbd-hint">tap <kbd>+</kbd> to leave a new memory &middot; <kbd>esc</kbd> closes the sheet</p>
   </main>
 
-  <button class="fab" id="open-add" aria-haspopup="dialog" aria-controls="add-modal">
+  <button type="button" class="fab" id="open-add" aria-haspopup="dialog" aria-controls="add-modal" aria-expanded="false">
     <span class="plus">+</span>
     <span>Add a memory</span>
   </button>

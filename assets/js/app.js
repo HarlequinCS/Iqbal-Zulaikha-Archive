@@ -86,6 +86,48 @@ function contentKey(m) {
   ].join("\u0001");
 }
 
+/** Collapse duplicate rows that point at the same media (e.g. Threads + IG reel same id). Keeps the first doc in snapshot order (newest first). */
+function archiveUrlDedupeKey(url) {
+  const raw = (url || "").trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(raw);
+    u.hash = "";
+    const host = u.hostname.replace(/^www\./, "").toLowerCase();
+    const parts = u.pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1] || "";
+    const threadsOrIg =
+      host.endsWith("threads.com") ||
+      host.endsWith("threads.net") ||
+      host.endsWith("instagram.com");
+    if (threadsOrIg && last && /^[A-Za-z0-9_-]+$/.test(last)) {
+      return `meta:${last}`;
+    }
+    if (host.endsWith("tiktok.com") || host === "vm.tiktok.com") {
+      return `tt:${(last || raw).toLowerCase()}`;
+    }
+    return `${host}${u.pathname}`.toLowerCase();
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
+function dedupeMemoriesByUrl(list) {
+  const seen = new Set();
+  const out = [];
+  for (const m of list) {
+    const k = archiveUrlDedupeKey(m.url);
+    if (!k) {
+      out.push(m);
+      continue;
+    }
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(m);
+  }
+  return out;
+}
+
 /* =========================================================
    Platform detection + logo tile (no video embeds)
    ========================================================= */
@@ -393,6 +435,7 @@ function setupGlobalEscape() {
     if (e.key !== "Escape") return;
     const noteM = $("#note-edit-modal");
     const addM = $("#add-modal");
+    const fab = $("#open-add");
     if (noteM?.classList.contains("is-open")) {
       noteM.classList.remove("is-open");
       document.body.style.overflow = addM?.classList.contains("is-open") ? "hidden" : "";
@@ -400,7 +443,9 @@ function setupGlobalEscape() {
     }
     if (addM?.classList.contains("is-open")) {
       addM.classList.remove("is-open");
+      fab?.setAttribute("aria-expanded", "false");
       document.body.style.overflow = "";
+      fab?.focus();
     }
   });
 }
@@ -477,12 +522,27 @@ function memoryCardHTML(m, identity) {
     ? `<div class="identity-banner" role="note">Choose <strong>who you are</strong> above first — then you can leave your note here.</div>`
     : "";
 
+  const isDone = !!m.doneWatching;
+  const doneBadge = isDone
+    ? `<span class="done-badge" title="Both moved on from this one"><span class="check">✓</span> done</span>`
+    : "";
+  const doneLabel = isDone ? "done watching" : "mark done";
+  const doneTitle = isDone
+    ? "Move this back to the main feed"
+    : "Hide from the main feed and keep it in Done watching";
+
+  // Suppress entrance animation if this card was already rendered for the
+  // current filter — prevents a "flash" on every Firestore snapshot update.
+  const skipAnim = renderedIds.has(m.id);
+  renderedIds.add(m.id);
+
   return `
-    <article class="memory" data-id="${escapeAttr(m.id)}" data-mood="${escapeAttr(m.mood || "")}" data-owner="${ownerTag}">
+    <article class="memory${isDone ? " is-done" : ""}${skipAnim ? " no-anim" : ""}" data-id="${escapeAttr(m.id)}" data-mood="${escapeAttr(m.mood || "")}" data-owner="${ownerTag}">
       <div class="top">
         <span class="platform-tag pl-${platform}">${escapeHTML(platform)}</span>
         ${uploaderBadgeHTML(m)}
         ${moodPillHTML(m.mood)}
+        ${doneBadge}
         <span class="timestamp">${fmtTime(m.createdAt)}</span>
       </div>
       ${platformTileHTML(m.url, platform)}
@@ -493,6 +553,13 @@ function memoryCardHTML(m, identity) {
       </div>
       <div class="card-foot">
         <span class="open-link muted-link" title="Use the tile above">watch on ${escapeHTML(platformDisplayName(platform))} ↗</span>
+        <button
+          class="done-toggle${isDone ? " is-done" : ""}"
+          type="button"
+          data-toggle-done="${escapeAttr(m.id)}"
+          aria-pressed="${isDone ? "true" : "false"}"
+          title="${escapeAttr(doneTitle)}"
+        ><span class="check" aria-hidden="true">✓</span>${escapeHTML(doneLabel)}</button>
         <button class="react" type="button" data-react="${escapeAttr(m.id)}">
           <span class="heart">♡</span><span class="count">${Number(m.reactions || 0)}</span>
         </button>
@@ -504,12 +571,20 @@ function memoryCardHTML(m, identity) {
 function renderFeed(memories, filter) {
   const grid = $("#feed");
   const empty = $("#empty-state");
-  const list = applyFilter(memories, filter);
+  const list = applyFilter(dedupeMemoriesByUrl(memories), filter);
   const identity = getIdentity();
+
+  // Reset entry-animation tracking when the filter changes so cards
+  // gently animate in for the new view.
+  if (filter !== lastRenderedFilter) {
+    renderedIds = new Set();
+    lastRenderedFilter = filter;
+  }
 
   if (!list.length) {
     grid.innerHTML = "";
     empty.hidden = false;
+    updateFilterCounts(memories);
     return;
   }
   empty.hidden = true;
@@ -520,30 +595,52 @@ function renderFeed(memories, filter) {
   updateFilterCounts(memories);
 }
 
+function tsMillis(ts) {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (ts instanceof Date) return ts.getTime();
+  const n = Number(ts);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function applyFilter(list, filter) {
-  if (!filter || filter === "all") return list;
-  if (filter === "iqbal")    return list.filter(m => m.iqbalComment);
-  if (filter === "zulaikha") return list.filter(m => m.zulaikhaComment);
-  if (filter === "both")     return list.filter(m => m.iqbalComment && m.zulaikhaComment);
+  if (filter === "done") {
+    return list
+      .filter(m => m.doneWatching)
+      .slice()
+      .sort((a, b) => tsMillis(b.doneAt) - tsMillis(a.doneAt));
+  }
+  // All other feeds hide already-done items so the main archive stays current.
+  const active = list.filter(m => !m.doneWatching);
+  if (!filter || filter === "all") return active;
+  if (filter === "iqbal")    return active.filter(m => m.iqbalComment);
+  if (filter === "zulaikha") return active.filter(m => m.zulaikhaComment);
+  if (filter === "both")     return active.filter(m => m.iqbalComment && m.zulaikhaComment);
   if (filter.startsWith("mood:")) {
     const mood = filter.slice(5);
-    return list.filter(m => m.mood === mood);
+    return active.filter(m => m.mood === mood);
   }
-  return list;
+  return active;
 }
 
 function updateFilterCounts(memories) {
+  const unique = dedupeMemoriesByUrl(memories);
+  const active = unique.filter(m => !m.doneWatching);
+  const done   = unique.filter(m =>  m.doneWatching);
   const set = (sel, n) => { const el = $(sel); if (el) el.textContent = n; };
-  set('[data-count="all"]',      memories.length);
-  set('[data-count="zulaikha"]', memories.filter(m => m.zulaikhaComment).length);
-  set('[data-count="iqbal"]',    memories.filter(m => m.iqbalComment).length);
-  set('[data-count="both"]',     memories.filter(m => m.iqbalComment && m.zulaikhaComment).length);
+  set('[data-count="all"]',      active.length);
+  set('[data-count="zulaikha"]', active.filter(m => m.zulaikhaComment).length);
+  set('[data-count="iqbal"]',    active.filter(m => m.iqbalComment).length);
+  set('[data-count="both"]',     active.filter(m => m.iqbalComment && m.zulaikhaComment).length);
+  set('[data-count="done"]',     done.length);
 }
 
 /* =========================================================
    Filter pills
    ========================================================= */
 let activeFilter = "all";
+let renderedIds = new Set();
+let lastRenderedFilter = null;
 function setupFilters(getMemories, rerender) {
   $$(".filter-pill").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -559,7 +656,7 @@ function setupFilters(getMemories, rerender) {
 /* =========================================================
    Modal — add memory
    ========================================================= */
-function setupModal(onSubmit) {
+function setupModal(onSubmit, getMemories) {
   const modal = $("#add-modal");
   const openBtn = $("#open-add");
   const form = $("#add-form");
@@ -582,14 +679,18 @@ function setupModal(onSubmit) {
     }
     applyAddFormIdentity(who);
     modal.classList.add("is-open");
+    openBtn.setAttribute("aria-expanded", "true");
     document.body.style.overflow = "hidden";
     setTimeout(() => $("#mem-link")?.focus(), 200);
   };
   const close = () => {
     modal.classList.remove("is-open");
+    openBtn.setAttribute("aria-expanded", "false");
     document.body.style.overflow = "";
+    openBtn.focus();
   };
 
+  openBtn.setAttribute("aria-expanded", "false");
   openBtn.addEventListener("click", open);
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
   modal.querySelectorAll("[data-close]").forEach(el => el.addEventListener("click", close));
@@ -626,6 +727,12 @@ function setupModal(onSubmit) {
     }
     if (!payload.url) { $("#mem-link")?.focus(); return; }
     payload.platform = detectPlatform(payload.url);
+
+    const dupKey = archiveUrlDedupeKey(payload.url);
+    if (dupKey && getMemories && getMemories().some(m => archiveUrlDedupeKey(m.url) === dupKey)) {
+      toast("That link is already in the archive.");
+      return;
+    }
 
     const submitBtn = form.querySelector(".btn-primary");
     submitBtn.disabled = true; submitBtn.textContent = "saving…";
@@ -664,6 +771,81 @@ function toast(message, isError = false) {
 }
 
 /* =========================================================
+   Tiny burst of cute symbols around an element. Used by react
+   click + done toggle. Skips when reduced-motion is requested.
+   ========================================================= */
+function spawnCuteBurst(originEl, opts = {}) {
+  if (!originEl || !originEl.getBoundingClientRect) return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+  const symbols = opts.symbols || ["♡", "✿", "✦", "♥"];
+  const colors  = opts.colors  || ["#F4A6BC", "#E58AA6", "#C9B7EC", "#FBD0DA"];
+  const count   = opts.count   ?? 6;
+  const rect = originEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("span");
+    el.className = "cute-burst";
+    el.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+    el.style.color = colors[Math.floor(Math.random() * colors.length)];
+    el.style.left = cx + "px";
+    el.style.top  = cy + "px";
+    const dx = (Math.random() - 0.5) * 90;
+    const dy = -36 - Math.random() * 70;
+    el.style.setProperty("--dx", dx + "px");
+    el.style.setProperty("--dy", dy + "px");
+    el.style.fontSize = (12 + Math.random() * 10) + "px";
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1100);
+  }
+}
+
+/* =========================================================
+   Done watching toggle (shared, requires identity)
+   ========================================================= */
+function setupDoneWatching(getMemories) {
+  document.addEventListener("click", async e => {
+    const btn = e.target.closest("[data-toggle-done]");
+    if (!btn) return;
+
+    const who = getIdentity();
+    if (!who) {
+      toast("Choose who you are on this device first — tap Zulaikha or Iqbal above.");
+      $("#identity-bar")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const id = btn.dataset.toggleDone;
+    const mem = getMemories().find(m => m.id === id);
+    if (!mem) return;
+
+    const next = !mem.doneWatching;
+    btn.disabled = true;
+    if (next) {
+      spawnCuteBurst(btn, { symbols: ["✓", "✿", "♡", "✦"], colors: ["#76C893", "#B8E6C8", "#F4A6BC", "#C9B7EC"], count: 5 });
+    }
+    try {
+      const ref = fs.doc(db, COL_NAME, id);
+      await fs.setDoc(
+        ref,
+        {
+          doneWatching: next,
+          doneAt: next ? fs.serverTimestamp() : null,
+          doneBy: next ? who : null,
+        },
+        { merge: true }
+      );
+      toast(next ? "moved to done watching ♡" : "back to the feed ♡");
+    } catch (err) {
+      console.error("done toggle failed", err);
+      toast("couldn't update — try again", true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+/* =========================================================
    Reactions
    ========================================================= */
 function setupReactions(getMemories) {
@@ -678,9 +860,10 @@ function setupReactions(getMemories) {
     const span = btn.querySelector(".count");
     if (span) span.textContent = next;
     btn.animate(
-      [{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }],
+      [{ transform: "scale(1)" }, { transform: "scale(1.22)" }, { transform: "scale(1)" }],
       { duration: 280, easing: "cubic-bezier(.2,.8,.2,1)" }
     );
+    spawnCuteBurst(btn);
 
     try {
       const ref = fs.doc(db, COL_NAME, id);
@@ -715,6 +898,11 @@ function spawnAmbient() {
   setInterval(make, 3200);
 }
 
+/* Bump when seed `uploadedBy` (or other merged uploader fields) changes —
+   forces a one-time Firestore merge so badges stay correct for existing docs. */
+const SEED_UPLOADER_SYNC_VER = 1;
+const SEED_UPLOADER_LS_KEY = "archiveSeedUploaderVer";
+
 /* =========================================================
    Firestore: live data + smart hash-based seeder
    - For each entry in seed-data.js, we compute a stable
@@ -747,10 +935,16 @@ async function syncSeed() {
     toAdd.push({ m, hash: h, index: i });
   }
 
-  if (!toAdd.length) return { added: 0, wasEmpty };
+  const needUploaderPatch =
+    typeof localStorage !== "undefined" &&
+    localStorage.getItem(SEED_UPLOADER_LS_KEY) !== String(SEED_UPLOADER_SYNC_VER);
 
-  if (wasEmpty) toast("uploading our archive to the cloud…");
-  else          toast(`syncing ${toAdd.length} new ${toAdd.length === 1 ? "memory" : "memories"}…`);
+  if (!toAdd.length && !needUploaderPatch) return { added: 0, wasEmpty };
+
+  if (toAdd.length) {
+    if (wasEmpty) toast("uploading our archive to the cloud…");
+    else          toast(`syncing ${toAdd.length} new ${toAdd.length === 1 ? "memory" : "memories"}…`);
+  }
 
   const now = Date.now();
   const batch = fs.writeBatch(db);
@@ -766,12 +960,33 @@ async function syncSeed() {
       createdAt: fs.Timestamp.fromMillis(now - index * 60_000),
       order: SEED_MEMORIES.length - index,
       seeded: true,
+      uploadedBy: m.uploadedBy ?? "iqbal",
     }, { merge: true });
   }
+
+  if (needUploaderPatch) {
+    const skipPatch = new Set(toAdd.map(x => x.hash));
+    for (let i = 0; i < SEED_MEMORIES.length; i++) {
+      const m = SEED_MEMORIES[i];
+      const h = await sha256Hex(contentKey(m));
+      if (skipPatch.has(h)) continue;
+      const ref = fs.doc(col, h);
+      batch.set(ref, {
+        uploadedBy: m.uploadedBy ?? "iqbal",
+        seeded: true,
+      }, { merge: true });
+    }
+    try {
+      localStorage.setItem(SEED_UPLOADER_LS_KEY, String(SEED_UPLOADER_SYNC_VER));
+    } catch (_) { /* private mode */ }
+  }
+
   await batch.commit();
 
-  if (wasEmpty) toast("archive uploaded ♡");
-  else          toast(`added ${toAdd.length} new ${toAdd.length === 1 ? "memory" : "memories"} ♡`);
+  if (toAdd.length) {
+    if (wasEmpty) toast("archive uploaded ♡");
+    else          toast(`added ${toAdd.length} new ${toAdd.length === 1 ? "memory" : "memories"} ♡`);
+  }
 
   return { added: toAdd.length, wasEmpty };
 }
@@ -811,13 +1026,14 @@ async function boot() {
 
   setupFilters(getMemories, rerender);
   setupIdentityBar(getMemories, rerender);
-  setupModal(addMemoryToFirestore);
+  setupModal(addMemoryToFirestore, getMemories);
   setupNoteEditorModal(getMemories);
   setupGlobalEscape();
   setupReactions(getMemories);
+  setupDoneWatching(getMemories);
   spawnAmbient();
 
-  $("#feed").innerHTML = `<div class="feed-loading">loading our little archive…</div>`;
+  $("#feed").innerHTML = `<div class="feed-loading">loading our little archive ♡…</div>`;
 
   try {
     await syncSeed();

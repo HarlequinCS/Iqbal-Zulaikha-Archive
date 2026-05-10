@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#FBD8D9">
   <title>Iqbal &amp; Zulaikha — our little archive</title>
-  <meta name="description" content="A soft, private memory archive — reels, songs and tiny moments shared between Iqbal & Zulaikha.">
+  <meta name="description" content="A soft, private memory archive — reels, songs and tiny moments shared between Iqbal &amp; Zulaikha.">
 
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="shortcut icon" href="favicon.ico">
@@ -52,20 +52,23 @@
       <button class="filter-pill" data-filter="both" aria-pressed="false">
         <span class="dot both"></span> both wrote <span class="num" data-count="both">0</span>
       </button>
+      <button class="filter-pill filter-done" data-filter="done" aria-pressed="false">
+        <span class="dot done"></span> done watching <span class="num" data-count="done">0</span>
+      </button>
     </nav>
 
     <section class="feed" id="feed" aria-live="polite"></section>
 
     <div class="empty" id="empty-state" hidden>
       <div class="glyph">✿</div>
-      <h3>nothing matches yet</h3>
-      <p>try a different filter, or tap <strong>+ Add a memory</strong> to begin.</p>
+      <h3>nothing in this little corner yet ♡</h3>
+      <p>try a different filter — or tap <strong>+ Add a memory</strong> to leave something soft.</p>
     </div>
 
     <p class="kbd-hint">tap <kbd>+</kbd> to leave a new memory · <kbd>esc</kbd> closes the sheet</p>
   </main>
 
-  <button class="fab" id="open-add" aria-haspopup="dialog" aria-controls="add-modal">
+  <button type="button" class="fab" id="open-add" aria-haspopup="dialog" aria-controls="add-modal" aria-expanded="false">
     <span class="plus">+</span>
     <span>Add a memory</span>
   </button>
